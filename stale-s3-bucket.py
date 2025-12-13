@@ -5,10 +5,10 @@ from datetime import datetime, timedelta
 
 SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:970378220457:stale-ebs'  # Update as needed
 REGION = 'ap-south-1'  # Region for SNS and Dashboard placement
-DRY_RUN = True  # Set to True to test without deleting
-NOTIFY_ONLY = True  # Set to True to only notify without deleting
+DRY_RUN = False  # Set to True to test without deleting
+NOTIFY_ONLY = False  # Set to True to only notify without deleting
 # Configuration for S3
-STALE_DAYS_THRESHOLD = 90  # Buckets with objects older than X days
+STALE_DAYS_THRESHOLD = 0  # Buckets with objects older than X days
 EMPTY_BUCKETS_ONLY = True  # Only consider empty buckets
 CHECK_OBJECT_LAST_MODIFIED = True  # Check when objects were last modified
 
