@@ -4,8 +4,8 @@ import time
 
 SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:970378220457:stale-ebs'  # Update as needed
 REGION = 'ap-south-1'  # Region for SNS and Dashboard placement
-DRY_RUN = False # Set to True to test without deleting
-NOTIFY_ONLY = False # Set to True to only notify without deleting
+DRY_RUN = True # Set to True to test without deleting
+NOTIFY_ONLY = True # Set to True to only notify without deleting
 
 cloudwatch_main = boto3.client('cloudwatch', region_name=REGION)
 sns = boto3.client('sns', region_name=REGION)

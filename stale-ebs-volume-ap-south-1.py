@@ -9,7 +9,7 @@ ec2 = boto3.client('ec2')
 cloudwatch = boto3.client('cloudwatch')
 
 # Configuration flags
-DRY_RUN = False  # Set to True to test without deleting
+DRY_RUN = True # Set to True to test without deleting
 NOTIFY_ONLY = False  # Set to True to only notify without deleting
 
 def lambda_handler(event, context):
