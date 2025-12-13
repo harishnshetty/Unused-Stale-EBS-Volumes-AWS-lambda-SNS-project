@@ -8,6 +8,10 @@ SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:970378220457:stale-ebs'
 ec2 = boto3.client('ec2')
 cloudwatch = boto3.client('cloudwatch')
 
+# Configuration flags
+DRY_RUN = False  # Set to True to test without deleting
+NOTIFY_ONLY = False  # Set to True to only notify without deleting
+
 def lambda_handler(event, context):
     # Step 1: Count total EBS volumes
     all_volumes = ec2.describe_volumes()
@@ -23,7 +27,25 @@ def lambda_handler(event, context):
     stale_volume_ids = [vol['VolumeId'] for vol in available_volumes['Volumes']]
     stale_volume_list_str = '\n'.join(stale_volume_ids) if stale_volume_ids else "No stale volumes."
 
-    # Step 3: Push custom metrics to CloudWatch
+    # Step 3: Delete stale volumes based on flags
+    deletion_results = []
+    if not NOTIFY_ONLY and stale_volume_ids:
+        for volume_id in stale_volume_ids:
+            try:
+                if not DRY_RUN:
+                    # Actually delete the volume
+                    ec2.delete_volume(VolumeId=volume_id)
+                    deletion_results.append(f"{volume_id} - DELETED")
+                else:
+                    # Dry run - just log what would be deleted
+                    deletion_results.append(f"{volume_id} - WOULD BE DELETED (Dry Run)")
+            except Exception as e:
+                deletion_results.append(f"{volume_id} - ERROR: {str(e)}")
+    
+    # Format deletion results for display
+    deletion_results_str = '\n'.join(deletion_results) if deletion_results else "No volumes were deleted."
+    
+    # Step 4: Push custom metrics to CloudWatch
     cloudwatch.put_metric_data(
         Namespace='Custom/EBSMetrics',
         MetricData=[
@@ -42,7 +64,7 @@ def lambda_handler(event, context):
         ]
     )
 
-    # Step 4: Create widgets for dashboard (counts and text)
+    # Step 5: Create widgets for dashboard (counts and text)
     widgets = [
         {
             "type": "metric",
@@ -77,30 +99,45 @@ def lambda_handler(event, context):
             "x": 0,
             "y": 6,
             "width": 12,
-            "height": 6,
+            "height": 3,
             "properties": {
                 "markdown": f"### Stale EBS Volume IDs\n```\n{stale_volume_list_str}\n```"
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 9,
+            "width": 12,
+            "height": 3,
+            "properties": {
+                "markdown": f"### Deletion Results\n**Mode:** {'NOTIFY ONLY' if NOTIFY_ONLY else ('DRY RUN' if DRY_RUN else 'ACTIVE DELETION')}\n```\n{deletion_results_str}\n```"
             }
         }
     ]
 
-    # Step 5: Email report using SNS
+    # Step 6: Email report using SNS
     email_body = f"""Stale EBS Volume Report
+
+Execution Mode: {'NOTIFY ONLY' if NOTIFY_ONLY else ('DRY RUN' if DRY_RUN else 'ACTIVE DELETION')}
 
 Total EBS Volumes: {total_count}
 Stale (Unattached) Volumes: {available_count}
 
-Volume IDs:
+Stale Volume IDs:
 {stale_volume_list_str}
+
+Deletion Results:
+{deletion_results_str}
 """
 
     sns.publish(
         TopicArn=SNS_TOPIC_ARN,
-        Subject="Stale EBS Volume Report",
+        Subject=f"Stale EBS Volume Report - Mode: {'NOTIFY ONLY' if NOTIFY_ONLY else ('DRY RUN' if DRY_RUN else 'ACTIVE')}",
         Message=email_body
     )
 
-    # Step 6: Update the dashboard
+    # Step 7: Update the dashboard
     dashboard_body = json.dumps({"widgets": widgets})
 
     cloudwatch.put_dashboard(
@@ -110,5 +147,5 @@ Volume IDs:
 
     return {
         'statusCode': 200,
-        'body': f'Dashboard updated. Total: {total_count}, Available: {available_count}'
+        'body': f'Dashboard updated. Total: {total_count}, Available: {available_count}, Mode: {"NOTIFY ONLY" if NOTIFY_ONLY else ("DRY RUN" if DRY_RUN else "ACTIVE DELETION")}'
     }
