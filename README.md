@@ -12,3 +12,14 @@
                 "s3:ListBucket",
                 "ec2:DescribeSnapshots",
                 "s3:DeleteBucket"
+
+                 ],
+            "Resource": "*"
+        }
+    ]
+}
+
+CloudWatchFullAccess
+
+
+CloudWatchFullAccessV2
