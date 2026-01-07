@@ -1,6 +1,7 @@
 import boto3
 import json
 import time
+from datetime import datetime, timedelta, timezone
 
 sns = boto3.client('sns')
 SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:970378220457:stale-ebs'  
@@ -11,6 +12,7 @@ cloudwatch = boto3.client('cloudwatch')
 # Configuration flags
 DRY_RUN = True # Set to True to test without deleting
 NOTIFY_ONLY = False  # Set to True to only notify without deleting
+STALE_DAYS_THRESHOLD = 7 # Days threshold for identifying stale volumes
 
 def lambda_handler(event, context):
     # Step 1: Count total EBS volumes
@@ -23,8 +25,16 @@ def lambda_handler(event, context):
     )
     available_count = len(available_volumes['Volumes'])
 
-    # Get list of stale EBS volume IDs
-    stale_volume_ids = [vol['VolumeId'] for vol in available_volumes['Volumes']]
+    # Calculate the threshold date
+    current_time = datetime.now(timezone.utc)
+    threshold_time = current_time - timedelta(days=STALE_DAYS_THRESHOLD)
+
+    # Get list of stale EBS volume IDs (created more than 7 days ago)
+    stale_volume_ids = []
+    for vol in available_volumes['Volumes']:
+        if vol['CreateTime'] < threshold_time:
+            stale_volume_ids.append(vol['VolumeId'])
+
     stale_volume_list_str = '\n'.join(stale_volume_ids) if stale_volume_ids else "No stale volumes."
 
     # Step 3: Delete stale volumes based on flags
@@ -122,7 +132,8 @@ def lambda_handler(event, context):
 Execution Mode: {'NOTIFY ONLY' if NOTIFY_ONLY else ('DRY RUN' if DRY_RUN else 'ACTIVE DELETION')}
 
 Total EBS Volumes: {total_count}
-Stale (Unattached) Volumes: {available_count}
+Available (Unattached) Volumes: {available_count}
+Stale Volumes (> {STALE_DAYS_THRESHOLD} days): {len(stale_volume_ids)}
 
 Stale Volume IDs:
 {stale_volume_list_str}

@@ -1,11 +1,13 @@
 import boto3
 import json
 import time
+from datetime import datetime, timedelta, timezone
 
 SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:970378220457:stale-ebs'  # Update as needed
 REGION = 'ap-south-1'  # Region for SNS and Dashboard placement
 DRY_RUN = True # Set to True to test without deleting
 NOTIFY_ONLY = True # Set to True to only notify without deleting
+STALE_DAYS_THRESHOLD = 7 # Days threshold for identifying stale volumes
 
 cloudwatch_main = boto3.client('cloudwatch', region_name=REGION)
 sns = boto3.client('sns', region_name=REGION)
@@ -15,9 +17,14 @@ def lambda_handler(event, context):
     regions = [r['RegionName'] for r in ec2_global.describe_regions()['Regions']]
 
     total_volumes_global = 0
-    stale_volumes_global = 0
+    total_available_global = 0
+    total_stale_global = 0
     stale_volume_ids_all = []
     deleted_volumes = []
+
+    # Calculate the threshold date
+    current_time = datetime.now(timezone.utc)
+    threshold_time = current_time - timedelta(days=STALE_DAYS_THRESHOLD)
 
     widgets = []
 
@@ -35,7 +42,11 @@ def lambda_handler(event, context):
         )
         available_count = len(available_volumes['Volumes'])
 
-        stale_ids = [vol['VolumeId'] for vol in available_volumes['Volumes']]
+        # Filter stale volumes based on age
+        stale_ids = []
+        for vol in available_volumes['Volumes']:
+            if vol['CreateTime'] < threshold_time:
+                stale_ids.append(vol['VolumeId'])
         
         # Delete stale volumes based on flags
         region_deleted_volumes = []
@@ -61,7 +72,8 @@ def lambda_handler(event, context):
         stale_volume_ids_all.extend([f"{region}: {vid}" for vid in stale_ids])
 
         total_volumes_global += total_count
-        stale_volumes_global += available_count
+        total_available_global += available_count
+        total_stale_global += len(stale_ids)
 
         timestamp = time.time()
         cloudwatch.put_metric_data(
@@ -149,7 +161,8 @@ def lambda_handler(event, context):
 Execution Mode: {'NOTIFY ONLY' if NOTIFY_ONLY else ('DRY RUN' if DRY_RUN else 'ACTIVE DELETION')}
 
 Total EBS Volumes: {total_volumes_global}
-Stale (Unattached) Volumes: {stale_volumes_global}
+Available (Unattached) Volumes: {total_available_global}
+Stale Volumes (> {STALE_DAYS_THRESHOLD} days): {total_stale_global}
 
 Stale Volume IDs:
 {stale_volume_list_str}
@@ -173,5 +186,5 @@ Deletion Results:
 
     return {
         'statusCode': 200,
-        'body': f'Dashboard updated. Total: {total_volumes_global}, Stale: {stale_volumes_global}, Mode: {"NOTIFY ONLY" if NOTIFY_ONLY else ("DRY RUN" if DRY_RUN else "ACTIVE DELETION")}'
+        'body': f'Dashboard updated. Total: {total_volumes_global}, Available: {total_available_global}, Stale: {total_stale_global}, Mode: {"NOTIFY ONLY" if NOTIFY_ONLY else ("DRY RUN" if DRY_RUN else "ACTIVE DELETION")}'
     }
