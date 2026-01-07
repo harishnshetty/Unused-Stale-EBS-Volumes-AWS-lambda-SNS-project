@@ -4,14 +4,14 @@ import time
 from datetime import datetime, timedelta, timezone
 
 sns = boto3.client('sns')
-SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:970378220457:stale-ebs'  
+SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:970378220457:stale-ebs-topic'  
 
 ec2 = boto3.client('ec2')
 cloudwatch = boto3.client('cloudwatch')
 
 # Configuration flags
 DRY_RUN = True # Set to True to test without deleting
-NOTIFY_ONLY = False  # Set to True to only notify without deleting
+NOTIFY_ONLY = True  # Set to True to only notify without deleting
 STALE_DAYS_THRESHOLD = 7 # Days threshold for identifying stale volumes
 
 def lambda_handler(event, context):

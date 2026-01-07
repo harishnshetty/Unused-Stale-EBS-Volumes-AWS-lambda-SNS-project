@@ -3,7 +3,7 @@ import json
 import time
 from datetime import datetime, timedelta, timezone
 
-SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:970378220457:stale-ebs'  # Update as needed
+SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:970378220457:stale-ebs-topic'  # Update as needed
 REGION = 'ap-south-1'  # Region for SNS and Dashboard placement
 DRY_RUN = True # Set to True to test without deleting
 NOTIFY_ONLY = True # Set to True to only notify without deleting
